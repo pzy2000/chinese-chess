@@ -21,6 +21,10 @@
 - 走子：`makeMove(bd,m)` / `unmakeMove(bd,m)` 成对；`legalMoves` 会试走过滤自杀着。
 - 模式 `G.mode`：`pve` 人机 / `pvp` 双人 / `eve` AI 互殴观战。
 - 终局 `G.status`：`checkmate` `stalemate` `forfeit` `draw` `timeout`；`isGameOver()` 是纯函数，别往里塞副作用。
+- 交互态：`G.selected/targets` 选中、`G.cursor` 键盘光标、`G.drag` 拖拽、`G.hint` 提示着法、`G.future` 前进栈、`G.review` 棋谱回看手数（`null` = 实时）。
+  - `G.gen` 是局面世代号，`resetMeta()`（新局 / 存档载入 / 棋谱导入）会 +1；`maybeAI()` 与 `requestHint()` 在 await 之后比对世代号，不一致就丢弃结果——否则在算的旧着法会落到新局面上（AI 连走两步）。
+  - `G.review !== null` 时 `myTurn()` 恒 false、`renderStatus()` 走回看分支、计时暂停；`G.board` 被替换为 `boardAtPly()` 的重放结果，任何改局面的操作都要先 `exitReview()`。
+  - `resetMeta()` 统一清空 `future/review/hint/cursor/selected/drag`，`newGame/load/loadRecord` 都调它。
 
 ## 棋规要点（已实现，勿退化）
 
@@ -29,14 +33,38 @@
 - **困毙判负**（象棋规则，非国象和棋）。
 - **长打判负**：每手分类为 `将/杀/捉/闲`；单方长将 → 判负；单方长打、对方非长打 → 判负；双方同属长打或均无犯例 → 三次重复作和。`捉` 需净得子，等价交换算「兑」不算捉。
 
+## 交互功能
+
+- 走子：点击（选中 → 落点）与拖拽并存。`pointerdown` 总是记录 `G.drag`（含不可拖的情况），`pointerup` 一律走 `dragEnd()`；位移 < 4px 视为点击，否则拖动态，松手命中 `G.targets` 才走子、否则回弹。
+- 棋谱：点行/点格进入回看（`G.review`），`‹ ›` 翻手，「返回当前」退出；回看时棋盘加 `.reviewing` 且不计时。
+- 前进：`undo` 把弹出项压入 `G.future`，`redo` 出栈重放（pve 一次两手）；新走子会清空 `G.future`。
+- 提示：`analyze()`（引擎段纯函数）返回 `{move,score}`，`G.hint` 高亮起讫；观战模式隐藏该按钮。
+- 评估条：`evaluate()` 分数经 logistic 映射成红方占比，`render()` 里刷新。
+- 存取：中文记谱文本（复制）+ 紧凑串 `XQ1|初始FEN|from.to,…`（导出/导入，`parseRecord` 校验每着合法）。中文棋谱→着法的解析器未实现。
+- 快捷键：方向键/回车/Esc/H/U/R/F/N，输入框聚焦时不拦截。
+
 ## 测试
 
-无构建流程，用 Node 抽取引擎段 + headless Edge（CDP 真实时间）跑：
+游戏本身无构建、无运行时依赖；`package.json` / `node_modules` 只服务于测试。
 
-- 引擎单测（73 项）：perft 44 / 1920 / 79666 / **3290240** 是走法生成的权威校验，改引擎后必跑。
-- 浏览器集成（63 项）：点击走子、AI 应手、悔棋、存档、长打判决、观战模式。
+```
+npm i                # 装 playwright-core（唯一 devDependency）
+npm test             # 引擎单测 + 浏览器集成（56 项）
+npm run test:engine  # 只跑引擎（纯 Node，无需浏览器）
+npm run test:browser # 只跑浏览器
+```
 
-headless 不要用 `--virtual-time-budget`：AI 搜索的 `setTimeout(0)` 链会把虚拟时钟锁死，改用 CDP 驱动真实时间。
+| 文件 | 作用 |
+|---|---|
+| `tests/engine.mjs` | 抽取 `/*<ENGINE>*/` 段成临时 ESM 供 import（引擎段若有 DOM 引用这里会直接报错） |
+| `tests/engine.test.mjs` | 引擎单测：perft、棋规、FEN、棋谱、长打裁决、搜索 |
+| `tests/browser.mjs` | 找本机浏览器 + 载入 playwright-core；两者缺一则整体 skip |
+| `tests/browser.test.mjs` | 浏览器集成：走子/拖拽、AI、悔棋前进、提示、回看、导出导入、存档、观战、键盘、移动端 |
+
+- perft 44 / 1920 / 79666 / **3290240** 是走法生成的权威校验，改引擎后必跑 `npm run test:engine`。
+- 浏览器测试用真实时间，**不要** `--virtual-time-budget`：AI 搜索的 `setTimeout(0)` 链会把虚拟时钟锁死。
+- 找不到浏览器时用 `XIANGQI_CHROME=/path/to/browser npm run test:browser` 指定。
+- 坑：`G` 是 classic script 里的 `const`，不在 `window` 上，`page.evaluate` 里直接用标识符 `G`，别写 `window.G`。
 
 页面带 `?test=1` 会跑内置 perft 自测并把结果写到 `window.__XIANGQI_TEST__`。
 

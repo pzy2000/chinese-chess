@@ -1,0 +1,15 @@
+{
+  "name": "xiangqi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "单文件网页中国象棋（无构建、无运行时依赖）；tests/ 只用于开发期回归",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/engine.test.mjs tests/browser.test.mjs",
+    "test:engine": "node --test tests/engine.test.mjs",
+    "test:browser": "node --test tests/browser.test.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}
