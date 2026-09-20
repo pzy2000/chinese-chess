@@ -19,8 +19,11 @@
 - 棋盘 `board[90]`，`idx = row*9 + col`；row0 = 黑方底线（上），row9 = 红方底线（下）。
 - 棋子字符：红 `K A B N R C P`（帅仕相马车炮兵），黑为小写。空 = `null`。
 - 走子：`makeMove(bd,m)` / `unmakeMove(bd,m)` 成对；`legalMoves` 会试走过滤自杀着。
+- FEN：`toFEN(bd,turn,half,full)`（half/full 可省，默认 `0 1`）；`fromFEN` 做结构校验（10 行 × 9 列、合法字符、走子方）并返回 `{board,turn,half,full}`；`fenIssues(bd,turn)` 做局面校验（兵行范围 / 士象将九宫 / 子力上限 / 非走子方不得被将），返回错误数组。
 - 模式 `G.mode`：`pve` 人机 / `pvp` 双人 / `eve` AI 互殴观战。
 - 终局 `G.status`：`checkmate` `stalemate` `forfeit` `draw` `timeout`；`isGameOver()` 是纯函数，别往里塞副作用。
+- `G.half` 是自然限着计数（距上次吃子的手数），由 `halfmoveClock(initFen, history)` 从棋谱重算，**不进存档**；undo/redo/载入天然一致。
+- `G.offer` = `{kind:'resign'|'draw', by:'r'|'b'}` 认输确认 / 提和应答，横幅 `#offerBar` 呈现；`resetMeta()` 清空。
 - 交互态：`G.selected/targets` 选中、`G.cursor` 键盘光标、`G.drag` 拖拽、`G.hint` 提示着法、`G.future` 前进栈、`G.review` 棋谱回看手数（`null` = 实时）。
   - `G.gen` 是局面世代号，`resetMeta()`（新局 / 存档载入 / 棋谱导入）会 +1；`maybeAI()` 与 `requestHint()` 在 await 之后比对世代号，不一致就丢弃结果——否则在算的旧着法会落到新局面上（AI 连走两步）。
   - `G.review !== null` 时 `myTurn()` 恒 false、`renderStatus()` 走回看分支、计时暂停；`G.board` 被替换为 `boardAtPly()` 的重放结果，任何改局面的操作都要先 `exitReview()`。
@@ -31,7 +34,12 @@
 - 蹩马腿、塞象眼、炮翻山、兵过河、兵不后退、九宫限制。
 - **将帅照面**等价于被将军：`isChecked` 里两将同列无挡子即算将军。
 - **困毙判负**（象棋规则，非国象和棋）。
-- **长打判负**：每手分类为 `将/杀/捉/闲`；单方长将 → 判负；单方长打、对方非长打 → 判负；双方同属长打或均无犯例 → 三次重复作和。`捉` 需净得子，等价交换算「兑」不算捉。
+- **60 回合自然限着作和**：`halfmoveClock` 计数（只有吃子清零，兵推进不清零），连续 120 半回合无吃子 → `draw`；杀 / 困毙优先。
+- **长打判负**：`classifyMove(bd, h)` 传的是**走子前**的局面（`repetitionVerdict` 维护 `boards[]`），每手分类为
+  `check` 主动将 / `counter` 解将反将 / `parry` 解将 / `mate` 杀 / `chase` 捉 / `exch` 兑 / `offer` 献 / `block` 拦 / `follow` 跟 / `idle` 闲。
+  「打」= `DA_TAGS` = 将/反将/杀/捉；**解将不算打**。单方长将（只看 `check`）→ 判负；单方长打、对方非长打 → 判负；
+  双方同属长打或均无犯例（长兑 / 长献 / 长拦 / 长跟 / 长闲）→ 三次重复作和。
+- `捉` 以 `see()`（静态兑换评估，含根子保护与多子捉一子）净得子为准；净得 0 记「兑」，盯有根子记「跟」，送吃记「献」，切断对方车线记「拦」。
 
 ## 交互功能
 
@@ -41,6 +49,8 @@
 - 提示：`analyze()`（引擎段纯函数）返回 `{move,score}`，`G.hint` 高亮起讫；观战模式隐藏该按钮。
 - 评估条：`evaluate()` 分数经 logistic 映射成红方占比，`render()` 里刷新。
 - 存取：中文记谱文本（复制）+ 紧凑串 `XQ1|初始FEN|from.to,…`（导出/导入，`parseRecord` 校验每着合法）。中文棋谱→着法的解析器未实现。
+- FEN 载入 / 棋谱导入 / 存档载入共用 `validateFen(fen)` = `fromFEN` 结构校验 + `fenIssues` 局面校验，不合法直接拒绝并 toast 首条原因（局面保持不变）。
+- 认输 / 求和：`#btnResign` / `#btnDraw`（终局禁用、观战隐藏）。认输需横幅二次确认；提和在 `pvp` 由对方同意/拒绝，在 `pve` 由 `aiDrawReply()` 按 `analyze()` 分数应答（AI 不吃亏才和）。
 - 快捷键：方向键/回车/Esc/H/U/R/F/N，输入框聚焦时不拦截。
 
 ## 测试
@@ -49,7 +59,7 @@
 
 ```
 npm i                # 装 playwright-core（唯一 devDependency）
-npm test             # 引擎单测 + 浏览器集成（56 项）
+npm test             # 引擎单测 + 浏览器集成（93 项）
 npm run test:engine  # 只跑引擎（纯 Node，无需浏览器）
 npm run test:browser # 只跑浏览器
 ```
@@ -57,9 +67,9 @@ npm run test:browser # 只跑浏览器
 | 文件 | 作用 |
 |---|---|
 | `tests/engine.mjs` | 抽取 `/*<ENGINE>*/` 段成临时 ESM 供 import（引擎段若有 DOM 引用这里会直接报错） |
-| `tests/engine.test.mjs` | 引擎单测：perft、棋规、FEN、棋谱、长打裁决、搜索 |
+| `tests/engine.test.mjs` | 引擎单测：perft、棋规、FEN/局面校验、自然限着、棋谱、SEE 与长打裁决、搜索 |
 | `tests/browser.mjs` | 找本机浏览器 + 载入 playwright-core；两者缺一则整体 skip |
-| `tests/browser.test.mjs` | 浏览器集成：走子/拖拽、AI、悔棋前进、提示、回看、导出导入、存档、观战、键盘、移动端 |
+| `tests/browser.test.mjs` | 浏览器集成：走子/拖拽、AI、悔棋前进、提示、回看、导出导入、存档、观战、认输求和、FEN 校验、键盘、移动端 |
 
 - perft 44 / 1920 / 79666 / **3290240** 是走法生成的权威校验，改引擎后必跑 `npm run test:engine`。
 - 浏览器测试用真实时间，**不要** `--virtual-time-budget`：AI 搜索的 `setTimeout(0)` 链会把虚拟时钟锁死。

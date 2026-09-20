@@ -308,6 +308,154 @@ describe('人机与观战', () => {
   });
 });
 
+describe('认输 / 求和 / FEN 校验 / 自然限着', () => {
+  before(async () => {
+    if (!C) return;
+    await C.page.selectOption('#selMode', 'pvp');
+    await C.page.click('#btnNew');
+    await C.page.evaluate(() => { G.flip = false; renderAll(); render(); });
+    await C.page.waitForTimeout(150);
+    geo = await boardGeo(C.page);
+  });
+
+  test('非法 FEN 被拒绝，局面不变且给出原因', async t => {
+    if (!need(t)) return;
+    const before = await snap(C.page);
+    await C.page.fill('#fenInput', '4k4/9/9/9/9/9/9/9/4P4/4K4 w - - 0 1');   // 红兵在第 9 行
+    await C.page.click('#btnFenLoad');
+    await C.page.waitForTimeout(120);
+    assert.deepEqual(await snap(C.page), before);
+    assert.match(await C.page.textContent('#toast'), /^FEN 无效：/);
+  });
+
+  test('结构非法的 FEN 也被拒绝', async t => {
+    if (!need(t)) return;
+    await C.page.fill('#fenInput', '4k4/9/9/9/9/9/9/9/9 w - - 0 1');          // 只有 9 行
+    await C.page.click('#btnFenLoad');
+    await C.page.waitForTimeout(120);
+    assert.match(await C.page.textContent('#toast'), /^FEN 无效：/);
+  });
+
+  test('合法 FEN 可以载入', async t => {
+    if (!need(t)) return;
+    await C.page.fill('#fenInput', '4k4/9/9/9/9/9/9/9/9/5K3 w - - 0 1');
+    await C.page.click('#btnFenLoad');
+    await C.page.waitForTimeout(150);
+    assert.equal(await C.page.evaluate(() => document.querySelectorAll('.piece').length), 2);
+    assert.equal(await C.page.evaluate(() => G.history.length), 0);
+  });
+
+  test('棋谱导入的初始 FEN 同样校验', async t => {
+    if (!need(t)) return;
+    const msg = await C.page.evaluate(() => {
+      try { loadRecord('XQ1|4k4/9/9/9/9/9/9/9/4P4/4K4 w - - 0 1|'); return 'no-throw'; }
+      catch (e) { return e.message; }
+    });
+    assert.notEqual(msg, 'no-throw');
+  });
+
+  test('认输要确认，确认后判负', async t => {
+    if (!need(t)) return;
+    await C.page.click('#btnNew'); await C.page.waitForTimeout(150);
+    await C.page.click('#btnResign'); await C.page.waitForTimeout(80);
+    assert.ok(await C.page.evaluate(() => document.querySelector('#offerBar').classList.contains('show')));
+    assert.equal(await C.page.evaluate(() => G.status), 'play', '未确认前不应判负');
+    await C.page.click('#offerYes'); await C.page.waitForTimeout(120);
+    const r = await C.page.evaluate(() => ({status: G.status, winner: G.winner, reason: G.endReason,
+      ovl: document.querySelector('#ovl').classList.contains('show')}));
+    assert.equal(r.status, 'forfeit');
+    assert.equal(r.winner, 'b');
+    assert.match(r.reason, /认输/);
+    assert.ok(r.ovl, '应弹出终局遮罩');
+  });
+
+  test('终局后认输 / 求和按钮禁用', async t => {
+    if (!need(t)) return;
+    const d = await C.page.evaluate(() => [document.querySelector('#btnResign').disabled,
+                                           document.querySelector('#btnDraw').disabled]);
+    assert.deepEqual(d, [true, true]);
+  });
+
+  test('提和被拒绝则继续对局', async t => {
+    if (!need(t)) return;
+    await C.page.click('#btnNew'); await C.page.waitForTimeout(150);
+    await C.page.click('#btnDraw'); await C.page.waitForTimeout(80);
+    assert.match(await C.page.textContent('#offerTxt'), /提和/);
+    await C.page.click('#offerNo'); await C.page.waitForTimeout(80);
+    assert.equal(await C.page.evaluate(() => G.status), 'play');
+    assert.equal(await C.page.evaluate(() => document.querySelector('#offerBar').classList.contains('show')), false);
+    assert.equal(await C.page.evaluate(() => myTurn()), true);
+  });
+
+  test('提和并同意 → 和棋', async t => {
+    if (!need(t)) return;
+    await C.page.click('#btnDraw'); await C.page.waitForTimeout(80);
+    await C.page.click('#offerYes'); await C.page.waitForTimeout(120);
+    const r = await C.page.evaluate(() => ({status: G.status, reason: G.endReason,
+      txt: document.querySelector('#turnTxt').textContent}));
+    assert.equal(r.status, 'draw');
+    assert.match(r.reason, /议和/);
+    assert.equal(r.txt, '和棋');
+  });
+
+  test('观战模式隐藏认输 / 求和', async t => {
+    if (!need(t)) return;
+    const d = await C.page.evaluate(() => {
+      const m = G.mode; G.mode = 'eve'; syncControls();
+      const v = [getComputedStyle(document.querySelector('#btnResign')).display,
+                 getComputedStyle(document.querySelector('#btnDraw')).display];
+      G.mode = m; syncControls();
+      return v;
+    });
+    assert.deepEqual(d, ['none', 'none']);
+  });
+
+  test('人机：AI 处于劣势时接受议和', async t => {
+    if (!need(t)) return;
+    await C.page.selectOption('#selMode', 'pve');
+    await C.page.evaluate(() => newGame(INIT_FEN));
+    await C.page.waitForTimeout(150);
+    const r = await C.page.evaluate(async () => {
+      const orig = window.analyze;
+      window.analyze = async () => ({move: null, score: 600});    // 红大优 → AI（黑）劣势
+      requestDraw();
+      await new Promise(res => setTimeout(res, 250));
+      window.analyze = orig;
+      return {status: G.status, reason: G.endReason};
+    });
+    assert.equal(r.status, 'draw');
+    assert.match(r.reason, /议和/);
+  });
+
+  test('人机：AI 占优时拒绝议和', async t => {
+    if (!need(t)) return;
+    await C.page.evaluate(() => newGame(INIT_FEN));
+    await C.page.waitForTimeout(150);
+    const r = await C.page.evaluate(async () => {
+      const orig = window.analyze;
+      window.analyze = async () => ({move: null, score: -600});   // 黑大优
+      requestDraw();
+      await new Promise(res => setTimeout(res, 250));
+      window.analyze = orig;
+      return {status: G.status, toast: document.querySelector('#toast').textContent};
+    });
+    assert.equal(r.status, 'play');
+    assert.match(r.toast, /不同意和棋/);
+    await C.page.selectOption('#selMode', 'pvp');
+    await C.page.evaluate(() => newGame(INIT_FEN));
+  });
+
+  test('自然限着计数随走子显示', async t => {
+    if (!need(t)) return;
+    await C.page.evaluate(() => newGame(INIT_FEN));            // 回到完整初始局面
+    await C.page.waitForTimeout(150);
+    assert.match(await C.page.textContent('#repInfo'), /自然限着 0\/120/);
+    await clickCell(C.page, 9, 7); await clickCell(C.page, 7, 6);
+    assert.match(await C.page.textContent('#repInfo'), /自然限着 1\/120/);
+    assert.match(await C.page.inputValue('#fenInput'), / 1 \d+$/);
+  });
+});
+
 describe('键盘与移动端', () => {
   test('方向键移动光标、Esc 取消选择', async t => {
     if (!need(t)) return;

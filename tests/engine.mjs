@@ -9,11 +9,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const INDEX_HTML = path.resolve(HERE, '..', 'index.html');
 
 const EXPORTS = [
-  'ROWS', 'COLS', 'N', 'INIT_FEN', 'VAL', 'MATE',
+  'ROWS', 'COLS', 'N', 'INIT_FEN', 'VAL', 'MATE', 'NATURAL_LIMIT', 'TAG_CN', 'DA_TAGS',
   'at', 'rowOf', 'colOf', 'inB', 'sideOf', 'typeOf', 'other', 'inPalace',
   'genMoves', 'makeMove', 'unmakeMove', 'findKing', 'isChecked', 'legalMoves', 'perft',
   'toFEN', 'fromFEN', 'notation', 'numTxt', 'fileNum',
-  'threatMate', 'threatCapture', 'classifyMove', 'repetitionVerdict',
+  'halfmoveClock', 'naturalLimitVerdict', 'fenIssues',
+  'attackersOf', 'hasAttacker', 'see', 'blocksLine',
+  'threatMate', 'threatCapture', 'threatKind', 'classifyMove', 'repetitionVerdict',
   'evaluate', 'evalFor', 'findBestMove', 'analyze'
 ];
 
