@@ -23,7 +23,7 @@
 |:-:|:-:|
 | <img src="docs/screenshots/01-gameplay.png" width="480" alt="对局界面"> | <img src="docs/screenshots/02-hint.png" width="480" alt="AI 提示"> |
 | *桌面端对局：中文棋谱、双方计时、实时评估条，点击或拖拽走子* | *AI 提示：按 `H` 让引擎推荐着法，绿圈虚线标出起点与落点* |
-| <img src="docs/screenshots/03-review.png" width="480" alt="棋谱回看"> | <img src="docs/screenshots/04-mobile.png" width="230" alt="移动端"> |
+| <img src="docs/screenshots/03-review.png" width="480" alt="棋谱回看"> | <img src="docs/screenshots/04-mobile.png" height="375" alt="移动端"> |
 | *棋谱回看：点击任意一手回到该局面，`‹ ›` 翻手、一键返回当前* | *移动端自适应：布局随视口自动缩放，支持触屏点选与拖拽* |
 
 ## ✨ 特性
