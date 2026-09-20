@@ -6,6 +6,7 @@
 
 完整棋规（蹩马腿 / 将帅照面 / 困毙判负 / 长打裁决）· 内置 AI 引擎 · 中文棋谱 · 移动端适配
 
+[![在线试玩](https://img.shields.io/badge/▶%20在线试玩-pzy2000.github.io%2Fchinese--chess-success?logo=github)](https://pzy2000.github.io/chinese-chess/)
 [![HTML5](https://img.shields.io/badge/HTML5-单文件-E34F26?logo=html5&logoColor=white)](#-特性)
 [![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript&logoColor=black)](#-特性)
 [![依赖](https://img.shields.io/badge/运行时依赖-0-brightgreen)](#-特性)
@@ -40,7 +41,7 @@
 
 ## 🚀 快速开始
 
-无需安装、无需构建，任选其一：
+**在线试玩**：<https://pzy2000.github.io/chinese-chess/> —— 或本地运行，无需安装、无需构建：
 
 ```bash
 # 方式一：直接用浏览器打开 index.html（双击即可）

@@ -6,6 +6,7 @@
 
 Complete rules (leg-blocking / flying general / stalemate loss / perpetual-check adjudication) · built-in AI engine · Chinese notation · mobile-ready
 
+[![Play Online](https://img.shields.io/badge/▶%20Play%20Online-pzy2000.github.io%2Fchinese--chess-success?logo=github)](https://pzy2000.github.io/chinese-chess/)
 [![HTML5](https://img.shields.io/badge/HTML5-single%20file-E34F26?logo=html5&logoColor=white)](#-features)
 [![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript&logoColor=black)](#-features)
 [![Dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)](#-features)
@@ -40,7 +41,7 @@ Complete rules (leg-blocking / flying general / stalemate loss / perpetual-check
 
 ## 🚀 Quick Start
 
-No install, no build — pick either:
+**Play online now**: <https://pzy2000.github.io/chinese-chess/> — or run locally, no install / no build:
 
 ```bash
 # Option 1: open index.html in a browser (double-click it)
