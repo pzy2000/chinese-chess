@@ -2,7 +2,8 @@
   "name": "xiangqi",
   "version": "1.0.0",
   "private": true,
-  "description": "单文件网页中国象棋（无构建、无运行时依赖）；tests/ 只用于开发期回归",
+    "description": "单文件网页中国象棋（无构建、无运行时依赖）；tests/ 只用于开发期回归",
+    "license": "MIT",
   "type": "module",
   "scripts": {
     "test": "node --test tests/engine.test.mjs tests/browser.test.mjs",
