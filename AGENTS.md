@@ -48,7 +48,10 @@
 - 前进：`undo` 把弹出项压入 `G.future`，`redo` 出栈重放（pve 一次两手）；新走子会清空 `G.future`。
 - 提示：`analyze()`（引擎段纯函数）返回 `{move,score}`，`G.hint` 高亮起讫；观战模式隐藏该按钮。
 - 评估条：`evaluate()` 分数经 logistic 映射成红方占比，`render()` 里刷新。
-- 存取：中文记谱文本（复制）+ 紧凑串 `XQ1|初始FEN|from.to,…`（导出/导入，`parseRecord` 校验每着合法）。中文棋谱→着法的解析器未实现。
+- 存取：中文记谱文本（复制）+ 紧凑串 `XQ1|初始FEN|from.to,…`（导出/导入，`parseRecord` 校验每着合法）。
+  导入按钮两种都吃：`XQ1|` 开头走 `loadRecord()`，否则当中文棋谱走 `loadNotation()`——`notationTokens()` 抽着法（容忍手数/标点/废话），
+  `parseNotation()` 拆出 `{name,ptype,only,prefix,fromFile,act,arg}`，`notationHit()` 拿它去比对 `legalMoves()`（结构匹配，不自己算落点，所以平/进/退、纵线号与步数两套参数、前/后/中都走同一条路）。
+  `notationMoves(fen, text)` 是 `notation()` 的逆运算，返回 `[{from,to,…}]`，首行可以是 FEN（缺省初始局面）；异方着法 / 非法着法 / 歧义都 throw 并带上手数。
 - FEN 载入 / 棋谱导入 / 存档载入共用 `validateFen(fen)` = `fromFEN` 结构校验 + `fenIssues` 局面校验，不合法直接拒绝并 toast 首条原因（局面保持不变）。
 - 认输 / 求和：`#btnResign` / `#btnDraw`（终局禁用、观战隐藏）。认输需横幅二次确认；提和在 `pvp` 由对方同意/拒绝，在 `pve` 由 `aiDrawReply()` 按 `analyze()` 分数应答（AI 不吃亏才和）。
 - 快捷键：方向键/回车/Esc/H/U/R/F/N，输入框聚焦时不拦截。
@@ -59,7 +62,7 @@
 
 ```
 npm i                # 装 playwright-core（唯一 devDependency）
-npm test             # 引擎单测 + 浏览器集成（93 项）
+npm test             # 引擎单测 + 浏览器集成（103 项）
 npm run test:engine  # 只跑引擎（纯 Node，无需浏览器）
 npm run test:browser # 只跑浏览器
 ```
@@ -67,9 +70,9 @@ npm run test:browser # 只跑浏览器
 | 文件 | 作用 |
 |---|---|
 | `tests/engine.mjs` | 抽取 `/*<ENGINE>*/` 段成临时 ESM 供 import（引擎段若有 DOM 引用这里会直接报错） |
-| `tests/engine.test.mjs` | 引擎单测：perft、棋规、FEN/局面校验、自然限着、棋谱、SEE 与长打裁决、搜索 |
+| `tests/engine.test.mjs` | 引擎单测：perft、棋规、FEN/局面校验、自然限着、棋谱、中文棋谱解析、SEE 与长打裁决、搜索 |
 | `tests/browser.mjs` | 找本机浏览器 + 载入 playwright-core；两者缺一则整体 skip |
-| `tests/browser.test.mjs` | 浏览器集成：走子/拖拽、AI、悔棋前进、提示、回看、导出导入、存档、观战、认输求和、FEN 校验、键盘、移动端 |
+| `tests/browser.test.mjs` | 浏览器集成：走子/拖拽、AI、悔棋前进、提示、回看、导出导入、中文棋谱导入、存档、观战、认输求和、FEN 校验、键盘、移动端 |
 
 - perft 44 / 1920 / 79666 / **3290240** 是走法生成的权威校验，改引擎后必跑 `npm run test:engine`。
 - 浏览器测试用真实时间，**不要** `--virtual-time-budget`：AI 搜索的 `setTimeout(0)` 链会把虚拟时钟锁死。

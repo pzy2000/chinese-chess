@@ -184,6 +184,66 @@ describe('中文棋谱', () => {
   });
 });
 
+describe('中文棋谱 → 着法', () => {
+  test('标准开局四手：生成与解析互逆', () => {
+    const seq = [[70,67], [25,22], [88,69], [7,24]];      // 炮二平五 炮8平5 马二进三 马8进7
+    const bd = board(E.INIT_FEN);
+    let turn = 'r';
+    const toks = [];
+    for (const [f,t] of seq){
+      const m = mvOf(E, bd, turn, f, t);
+      assert.ok(m, f + '→' + t + ' 应合法');
+      toks.push(E.notation(bd, m));
+      E.makeMove(bd, m);
+      turn = E.other(turn);
+    }
+    assert.deepEqual(toks, ['炮二平五', '炮8平5', '马二进三', '马8进7']);
+    const back = E.notationMoves(E.INIT_FEN, toks.join(' '));
+    assert.deepEqual(back.map(m => [m.from, m.to]), seq);
+  });
+
+  test('带手数、换行、标点的棋谱文本照样解析', () => {
+    const txt = '1. 炮二平五，炮8平5\n2、马二进三  马8进7\n（红先）';
+    assert.deepEqual(E.notationMoves(E.INIT_FEN, txt).map(m => [m.from, m.to]),
+                     [[70,67], [25,22], [88,69], [7,24]]);
+  });
+
+  test('红黑数码混写也接受', () => {
+    assert.deepEqual(E.notationMoves(E.INIT_FEN, '炮2平5 炮8平5').map(m => [m.from, m.to]),
+                     [[70,67], [25,22]]);
+    assert.deepEqual(E.notationMoves(E.INIT_FEN, '炮二平五 炮八平五').map(m => [m.from, m.to]),
+                     [[70,67], [25,22]]);
+  });
+
+  test('「前/后」前缀：省略纵线号也能定位', () => {
+    const fen = '3k5/9/9/9/9/9/9/R8/9/R3K4 w - - 0 1';
+    assert.deepEqual(E.notationMoves(fen, '前车进一').map(m => [m.from, m.to]), [[63, 54]]);
+    assert.deepEqual(E.notationMoves(fen, '后车进一').map(m => [m.from, m.to]), [[81, 72]]);
+  });
+
+  test('帅 / 兵的步数记谱', () => {
+    const fen = '2k6/9/9/9/9/9/9/4P4/9/4K4 w - - 0 1';   // 黑将(0,2) 红兵(7,4) 红帅(9,4)
+    assert.deepEqual(E.notationMoves(fen, '帅五进一').map(m => [m.from, m.to]), [[85, 76]]);
+    assert.deepEqual(E.notationMoves(fen, '兵五进一').map(m => [m.from, m.to]), [[67, 58]]);
+  });
+
+  test('非法 / 异方 / 空文本抛错并指明手数', () => {
+    assert.throws(() => E.notationMoves(E.INIT_FEN, '车九进七'), /第 1 手.*合法着法/);   // 被自家卒挡住
+    assert.throws(() => E.notationMoves('3k5/9/9/9/9/9/9/9/9/4K4 w - - 0 1', '帅五平六'),
+                  /第 1 手.*合法着法/);                                                // 平过去就照面
+    assert.throws(() => E.notationMoves(E.INIT_FEN, '炮二平五 车九进七'), /第 2 手.*合法着法/);
+    assert.throws(() => E.notationMoves(E.INIT_FEN, '炮二平五 帅五进一'), /第 2 手.*红方着法/);
+    assert.throws(() => E.notationMoves(E.INIT_FEN, '将5进1'), /第 1 手.*黑方着法/);    // 该红方走
+    assert.throws(() => E.notationMoves(E.INIT_FEN, '今天天气不错'), /没有可识别的着法/);
+  });
+
+  test('从自定义 FEN 起步', () => {
+    const fen = '4k4/9/9/9/9/3R5/9/9/9/5K3 w - - 0 1';   // 红车(5,3) 红帅(9,5) 黑将(0,4)
+    assert.deepEqual(E.notationMoves(fen, '车六进二 将5进1').map(m => [m.from, m.to]),
+                     [[48, 30], [4, 13]]);
+  });
+});
+
 describe('长打裁决', () => {
   test('无重复局面时不判罚', () => {
     const fen = '3k5/9/9/9/9/R8/9/9/9/4K4 w - - 0 1';

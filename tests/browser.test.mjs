@@ -256,6 +256,64 @@ describe('导出 / 导入 / 存档', () => {
   });
 });
 
+describe('中文棋谱导入', () => {
+  before(async () => {
+    if (!C) return;
+    await C.page.selectOption('#selMode', 'pvp');
+    await C.page.click('#btnNew');
+    await C.page.evaluate(() => { G.flip = false; renderAll(); render(); });
+    await C.page.waitForTimeout(150);
+    geo = await boardGeo(C.page);
+  });
+
+  test('moveText() → loadNotation() 往返一致', async t => {
+    if (!need(t)) return;
+    await clickCell(C.page, 7, 7); await clickCell(C.page, 7, 4);   // 炮二平五
+    await clickCell(C.page, 2, 7); await clickCell(C.page, 2, 4);   // 炮8平5
+    const fen = await C.page.evaluate(() => toFEN(G.board, G.turn));
+    const txt = await C.page.evaluate(() => moveText());
+    assert.match(txt, /炮二平五/);
+    assert.match(txt, /炮8平5/, '黑方用阿拉伯数码记谱');
+    const after = await C.page.evaluate(t => {
+      loadNotation(t);
+      return { len: G.history.length, fen: toFEN(G.board, G.turn), init: G.initFen };
+    }, txt);
+    assert.equal(after.len, 2);
+    assert.equal(after.fen, fen);
+    assert.equal(after.init, 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1',
+                 '没给 FEN 时从初始局面起步');
+  });
+
+  test('首行带 FEN 时从该局面起步', async t => {
+    if (!need(t)) return;
+    const fen = '4k4/9/9/9/9/3R5/9/9/9/5K3 w - - 0 1';
+    const r = await C.page.evaluate(t => {
+      loadNotation(t + '\n车六进二');
+      return { len: G.history.length, fen: toFEN(G.board, G.turn), init: G.initFen };
+    }, fen);
+    assert.equal(r.init, fen);
+    assert.equal(r.len, 1);
+    assert.equal(r.fen, '4k4/9/9/3R5/9/9/9/9/9/5K3 b - - 0 1');
+  });
+
+  test('按钮导入中文棋谱，非法的被拒绝且局面不变', async t => {
+    if (!need(t)) return;
+    await C.page.click('#btnNew'); await C.page.waitForTimeout(150);
+    C.page.once('dialog', d => d.accept('1. 炮二平五 炮8平5'));
+    await C.page.click('#btnMvImport');
+    await C.page.waitForTimeout(150);
+    assert.equal(await C.page.evaluate(() => G.history.length), 2);
+    assert.match(await C.page.textContent('#toast'), /棋谱已载入（2 手）/);
+
+    const before = await snap(C.page);
+    C.page.once('dialog', d => d.accept('炮二平五 车九进七'));   // 第二手非法
+    await C.page.click('#btnMvImport');
+    await C.page.waitForTimeout(150);
+    assert.deepEqual(await snap(C.page), before, '导入失败不应改动局面');
+    assert.match(await C.page.textContent('#toast'), /^导入失败：.*第 2 手/);
+  });
+});
+
 describe('人机与观战', () => {
   test('人机模式 AI 会应手', async t => {
     if (!need(t)) return;

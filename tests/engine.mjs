@@ -13,6 +13,7 @@ const EXPORTS = [
   'at', 'rowOf', 'colOf', 'inB', 'sideOf', 'typeOf', 'other', 'inPalace',
   'genMoves', 'makeMove', 'unmakeMove', 'findKing', 'isChecked', 'legalMoves', 'perft',
   'toFEN', 'fromFEN', 'notation', 'numTxt', 'fileNum',
+  'notationTokens', 'parseNotation', 'notationHit', 'notationMoves',
   'halfmoveClock', 'naturalLimitVerdict', 'fenIssues',
   'attackersOf', 'hasAttacker', 'see', 'blocksLine',
   'threatMate', 'threatCapture', 'threatKind', 'classifyMove', 'repetitionVerdict',

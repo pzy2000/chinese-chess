@@ -596,6 +596,96 @@ function notation(bd, m){
   return prefix + head + act;
 }
 
+/* ---------- 中文棋谱 → 着法（与 notation() 互逆，供导入） ---------- */
+const CN_DIGIT = {};
+CN.forEach((ch, i) => { CN_DIGIT[ch] = i + 1; });
+// 红用中文数码、黑用阿拉伯数码；为兼容各处写法，两种都接受
+function cnDigit(ch){
+  if (CN_DIGIT[ch] !== undefined) return CN_DIGIT[ch];
+  return /^[1-9]$/.test(ch) ? +ch : NaN;
+}
+const PIECE_OF = {};                                   // 棋子名 → 类型（马/车/炮 两方同名）
+const NAME_SIDE = {};                                  // 只属于一方的棋子名 → 走子方
+for (const s of ['r','b']) for (const t of ['K','A','B','N','R','C','P']){
+  PIECE_OF[NAME[s][t]] = t;
+  if (t !== 'N' && t !== 'R' && t !== 'C') NAME_SIDE[NAME[s][t]] = s;
+}
+// 标准纵线记谱词形：〔前/后/中/数字前缀〕棋子〔纵线〕平|进|退 目标
+// 按词形直接捞词，可顺手吃掉手数、标点、「红方：」等杂质
+function notationTokens(text){
+  const re = /(?:[前中后]|[0-9一二三四五六七八九])?[帅将仕士相象马车炮兵卒](?:[0-9一二三四五六七八九])?[平进退][0-9一二三四五六七八九]/g;
+  return String(text || '').replace(/﻿/g, '').match(re) || [];
+}
+// 「炮二平五 / 前车进一 / 1卒平2」→ {name, ptype, only, prefix, fromFile, act, arg}
+function parseNotation(tok){
+  const s = String(tok);
+  let i = 0, prefix = null;
+  const c0 = s[0];
+  if (c0 === '前' || c0 === '后' || c0 === '中'){ prefix = c0; i = 1; }
+  else if (!PIECE_OF[c0] && cnDigit(c0) >= 1){ prefix = cnDigit(c0); i = 1; }   // 多兵数字前缀
+  const ptype = PIECE_OF[s[i]];
+  if (!ptype) throw new Error('无法解析的棋谱');
+  const name = s[i];
+  i++;
+  let fromFile = null;
+  if (prefix === null){                                   // 有前缀时按规则省略纵线号
+    fromFile = cnDigit(s[i]);
+    if (!(fromFile >= 1)) throw new Error('缺少纵线号');
+    i++;
+  }
+  const act = s[i];
+  if (act !== '平' && act !== '进' && act !== '退') throw new Error('缺少 平/进/退');
+  i++;
+  const arg = cnDigit(s[i]);
+  if (!(arg >= 1)) throw new Error('缺少目标');
+  return {name, ptype, only:NAME_SIDE[name] || null, prefix, fromFile, act, arg};
+}
+// tk 是否描述着法 m（bd = 走子「前」的局面，side = 走子方）
+function notationHit(bd, side, m, tk){
+  if (sideOf(m.piece) !== side || typeOf(m.piece) !== tk.ptype) return false;
+  const fr = rowOf(m.from), fc = colOf(m.from), tr = rowOf(m.to), tc = colOf(m.to);
+  if (tk.prefix === null){
+    if (fileNum(fc, side) !== tk.fromFile) return false;
+  } else {
+    const same = [];
+    for (let r=0;r<ROWS;r++){ const q = at(r,fc); if (bd[q] === m.piece) same.push(q); }
+    const ordered = same.slice().sort((a,b) => side==='r' ? a-b : b-a);
+    const pos = ordered.indexOf(m.from);
+    const want = tk.prefix === '前' ? 0
+               : tk.prefix === '后' ? ordered.length - 1
+               : tk.prefix === '中' ? 1 : tk.prefix - 1;
+    if (pos !== want) return false;
+  }
+  if (tr === fr) return tk.act === '平' && fileNum(tc, side) === tk.arg;
+  const fwd = side==='r' ? tr < fr : tr > fr;
+  if (tk.act !== (fwd ? '进' : '退')) return false;
+  const t = typeOf(m.piece);
+  const arg = (t === 'N' || t === 'A' || t === 'B') ? fileNum(tc, side) : Math.abs(tr - fr);
+  return arg === tk.arg;
+}
+// 中文棋谱 → 着法序列（initFen 起步）；任一手解析不出 / 不合法即抛错（带手数）
+function notationMoves(initFen, text){
+  const st = fromFEN(initFen);
+  let bd = st.board.slice(), turn = st.turn;
+  const toks = notationTokens(text);
+  if (!toks.length) throw new Error('没有可识别的着法（应为「炮二平五」这类中文棋谱）');
+  const out = [];
+  for (let i = 0; i < toks.length; i++){
+    const tok = toks[i], tk = parseNotation(tok);
+    if (tk.only && tk.only !== turn)
+      throw new Error('第 ' + (i+1) + ' 手「' + tok + '」是' + (tk.only==='r'?'红':'黑') +
+                      '方着法，当前轮到' + (turn==='r'?'红':'黑') + '方');
+    const hits = legalMoves(bd, turn).filter(m => notationHit(bd, turn, m, tk));
+    if (!hits.length) throw new Error('第 ' + (i+1) + ' 手「' + tok + '」不是该局面下的合法着法');
+    if (hits.length > 1) throw new Error('第 ' + (i+1) + ' 手「' + tok + '」有歧义');
+    const m = hits[0];
+    out.push({from:m.from, to:m.to, piece:m.piece, captured:m.captured || null});
+    makeMove(bd, m);
+    turn = other(turn);
+  }
+  return out;
+}
+
 /* ---------- 长打判定（长将 / 长捉 / 长杀） ----------
    象棋竞赛规则：将、杀、捉 属「打」（禁止着法）；兑、献、拦、跟、闲 属允许着法。
    · 单方长将（连续主动照将）→ 长将方判负（长将最严重，对方即便长打亦然）
@@ -955,6 +1045,7 @@ async function analyze(boardIn, side, level, timeCap){
 /* ==================== 界面 / 交互 ==================== */
 const $ = s => document.querySelector(s);
 const boardEl = $('#board');
+const fenEl = $('#fenInput');
 const INIT = fromFEN(INIT_FEN);
 
 const G = {
@@ -1238,8 +1329,8 @@ function renderClocks(){
   const show = s => G.limit ? fmtTime(Math.max(0, G.limit*1000 - G.timers[s])) : fmtTime(G.timers[s]);
   $('#tR').textContent = show('r');
   $('#tB').textContent = show('b');
-  $('#clkR').className = 'clock' + (G.turn==='r' && G.status!=='over' ? ' act' : '');
-  $('#clkB').className = 'clock' + (G.turn==='b' && G.status!=='over' ? ' act' : '');
+  $('#clkR').className = 'clock' + (G.turn==='r' && !isGameOver() ? ' act' : '');
+  $('#clkB').className = 'clock' + (G.turn==='b' && !isGameOver() ? ' act' : '');
   if (G.limit && G.timers.r > (G.limit*1000 - 30000)) $('#clkR').classList.add('low');
   if (G.limit && G.timers.b > (G.limit*1000 - 30000)) $('#clkB').classList.add('low');
 }
@@ -1320,7 +1411,9 @@ function render(){
   G.half = halfmoveClock(G.initFen, G.history);
   const ply = G.review === null ? G.history.length : G.review;
   const half = G.review === null ? G.half : halfmoveClock(G.initFen, G.history.slice(0, G.review));
-  $('#fenInput').value = toFEN(G.board, G.review === null ? G.turn : plyTurn(G.review), half, fullmoveAt(ply));
+  // 用户正在输入 FEN 时别覆盖（观战模式下 AI 每走一手都会 render 一次）
+  if (document.activeElement !== fenEl)
+    fenEl.value = toFEN(G.board, G.review === null ? G.turn : plyTurn(G.review), half, fullmoveAt(ply));
   $('#btnRedo').disabled = G.future.length === 0;
   $('#btnUndo').disabled = G.history.length === 0;
   $('#btnResign').disabled = isGameOver();
@@ -1809,12 +1902,12 @@ function parseRecord(txt){
     const a = x.split('.').map(Number);
     if (a.length !== 2 || !Number.isInteger(a[0]) || !Number.isInteger(a[1])) throw new Error('着法无法解析：' + x);
     if (a[0] < 0 || a[0] > 89 || a[1] < 0 || a[1] > 89) throw new Error('着法越界：' + x);
-    return a;
+    return {from:a[0], to:a[1]};
   });
   return {fen, moves};
 }
-function loadRecord(txt){
-  const {fen, moves} = parseRecord(txt);
+// 落到 fen 局面并重放着法（紧凑串 / 中文棋谱导入共用）；返回手数
+function applyPosition(fen, moves){
   const st = fromFEN(fen);
   G.initFen = fen;
   G.board = st.board.slice();
@@ -1826,36 +1919,57 @@ function loadRecord(txt){
   resetMeta();
   G.winner = null; G.thinking = false; G.status = 'play'; G.endReason = '';
   let n = 0;
-  for (const [f,t] of moves){
-    const m = legalMoves(G.board, G.turn).find(x => x.from === f && x.to === t);
+  for (const mv of moves){
+    const m = legalMoves(G.board, G.turn).find(x => x.from === mv.from && x.to === mv.to);
     if (!m) throw new Error('第 ' + (n + 1) + ' 手不合法');
     pushMove(m); n++;
   }
   refreshStatus();
+  return n;
+}
+function loadRecord(txt){
+  const {fen, moves} = parseRecord(txt);
+  const n = applyPosition(fen, moves);
+  renderAll(); render(); save();
+  toast('棋谱已载入（' + n + ' 手）');
+  maybeAI();
+}
+/* 中文棋谱导入：整段中文记谱（可带手数 / 标点），首行可以是 FEN，缺省初始局面 */
+function loadNotation(txt){
+  const s = String(txt || '').replace(/^﻿/, '');
+  let fen = INIT_FEN, rest = s;
+  const nl = s.indexOf('\n');
+  const first = (nl < 0 ? s : s.slice(0, nl)).trim();
+  if (/^[1-9kabnrcpKABNRCP/]+ [wb]( - - \d+ \d+)?$/.test(first)){
+    fen = first;
+    rest = nl < 0 ? '' : s.slice(nl + 1);
+  }
+  validateFen(fen);
+  const moves = notationMoves(fen, rest);
+  const n = applyPosition(fen, moves);
   renderAll(); render(); save();
   toast('棋谱已载入（' + n + ' 手）');
   maybeAI();
 }
 
 /* ---------- 计时 ---------- */
+// 时钟按「走子方」计：人机模式下 AI 思考的时间也记在 AI 账上，限时对双方一视同仁
 let lastTick = nowMs();
 setInterval(() => {
   const n = nowMs();
   const dt = n - lastTick;
   lastTick = n;
-  if (isGameOver() || G.thinking) return;
+  if (isGameOver()) return;
   if (G.review !== null) return;              // 回看时不计时
   if (!G.history.length) return;              // 第一步之后才开始计时
-  {
-    G.timers[G.turn] += dt;
-    if (G.limit && G.timers[G.turn] >= G.limit*1000){
-      G.status = 'timeout';
-      G.winner = other(G.turn);
-      sfx('lose');
-      render();
-      save();
-      return;
-    }
+  G.timers[G.turn] += dt;
+  if (G.limit && G.timers[G.turn] >= G.limit*1000){
+    G.status = 'timeout';
+    G.winner = other(G.turn);
+    sfx((G.mode==='pve' && G.winner !== humanSide()) ? 'lose' : 'win');
+    render();
+    save();
+    return;
   }
   renderClocks();
 }, 250);
@@ -1908,7 +2022,7 @@ $('#selSide').addEventListener('change', e => {
 });
 $('#selLimit').addEventListener('change', e => { G.limit = +e.target.value; renderClocks(); save(); });
 $('#btnFenLoad').addEventListener('click', () => {
-  const v = $('#fenInput').value.trim();
+  const v = fenEl.value.trim();
   if (!v){ toast('请先输入 FEN'); return; }
   try{
     validateFen(v);
@@ -1918,9 +2032,9 @@ $('#btnFenLoad').addEventListener('click', () => {
 });
 $('#btnFenCopy').addEventListener('click', async () => {
   const t = toFEN(G.board, G.turn);
-  $('#fenInput').value = t;
+  fenEl.value = t;
   try{ await navigator.clipboard.writeText(t); toast('FEN 已复制'); }
-  catch(e){ $('#fenInput').select(); toast('已填入，请手动复制'); }
+  catch(e){ fenEl.select(); toast('已填入，请手动复制'); }
 });
 $('#btnRedo').addEventListener('click', redo);
 $('#btnResign').addEventListener('click', requestResign);
@@ -1965,9 +2079,12 @@ $('#btnMvExport').addEventListener('click', () => {
   }catch(err){ toast('导出失败'); }
 });
 $('#btnMvImport').addEventListener('click', () => {
-  const v = window.prompt('粘贴棋谱串（XQ1|初始FEN|12.28,70.52,…）');
+  const v = window.prompt('粘贴棋谱：紧凑串 XQ1|初始FEN|12.28,70.52,…\n或中文棋谱（如：1. 炮二平五 马8进7）');
   if (!v) return;
-  try{ loadRecord(v); }
+  try{
+    if (/^\s*XQ1\|/.test(v)) loadRecord(v);
+    else loadNotation(v);
+  }
   catch(err){ toast('导入失败：' + (err && err.message ? err.message : '格式错误')); }
 });
 

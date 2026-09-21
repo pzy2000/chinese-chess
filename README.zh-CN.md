@@ -10,8 +10,8 @@
 [![HTML5](https://img.shields.io/badge/HTML5-单文件-E34F26?logo=html5&logoColor=white)](#-特性)
 [![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript&logoColor=black)](#-特性)
 [![依赖](https://img.shields.io/badge/运行时依赖-0-brightgreen)](#-特性)
-[![体积](https://img.shields.io/badge/体积-~71KB-orange)](#-特性)
-[![测试](https://img.shields.io/badge/tests-56%20passing-success)](#-测试)
+[![体积](https://img.shields.io/badge/体积-~89KB-orange)](#-特性)
+[![测试](https://img.shields.io/badge/tests-103%20passing-success)](#-测试)
 [![Perft](https://img.shields.io/badge/perft-verified-blue)](#-测试)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=nodedotjs&logoColor=white)](#-测试)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -31,12 +31,12 @@
 
 ## ✨ 特性
 
-- **零依赖单文件**：全部样式、规则引擎、AI、音效内联于一个 `index.html`（约 71KB），`file://` 直接打开即玩
+- **零依赖单文件**：全部样式、规则引擎、AI、音效内联于一个 `index.html`（约 89KB），`file://` 直接打开即玩
 - **完整棋规**：蹩马腿、塞象眼、炮翻山、兵过河不后退、将帅照面、困毙判负，以及长将 / 长捉 / 长杀的**长打裁决**
 - **内置 AI**：迭代加深 + Alpha-Beta 剪枝 + 静态搜索 + 将军延伸，三档难度；支持 AI 互殴观战模式
 - **辅助功能**：着法提示、局面评估条、悔棋 / 前进、棋盘翻转、被吃子统计
 - **中文棋谱**：标准纵线记谱（如「炮二平五」），点击棋谱任意行即可**回看**历史局面
-- **导入导出**：中文记谱文本复制、紧凑串（`XQ1|FEN|moves`）导入导出、FEN 载入，进度自动存档
+- **导入导出**：中文记谱文本复制、粘贴中文棋谱导入（`炮二平五 马8进7 …`，首行可给 FEN，解析器与记谱生成互为逆运算）、紧凑串（`XQ1|FEN|moves`）导入导出、FEN 载入，进度自动存档
 - **多端适配**：桌面 / 移动端布局自适应，触屏点选与拖拽并存，音效由 Web Audio 实时合成
 
 ## 🚀 快速开始
@@ -91,7 +91,7 @@ python3 -m http.server 8000
 
 ```bash
 npm i                  # 安装 playwright-core（唯一 devDependency，仅测试用）
-npm test               # 引擎单测 + 浏览器集成，共 56 项
+npm test               # 引擎单测 + 浏览器集成，共 103 项
 npm run test:engine    # 只跑引擎（纯 Node，无需浏览器）
 npm run test:browser   # 只跑浏览器集成（需本机有 Chrome / Edge）
 ```

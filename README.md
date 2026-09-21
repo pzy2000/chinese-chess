@@ -10,8 +10,8 @@ Complete rules (leg-blocking / flying general / stalemate loss / perpetual-check
 [![HTML5](https://img.shields.io/badge/HTML5-single%20file-E34F26?logo=html5&logoColor=white)](#-features)
 [![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript&logoColor=black)](#-features)
 [![Dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)](#-features)
-[![Size](https://img.shields.io/badge/size-~71KB-orange)](#-features)
-[![Tests](https://img.shields.io/badge/tests-56%20passing-success)](#-testing)
+[![Size](https://img.shields.io/badge/size-~89KB-orange)](#-features)
+[![Tests](https://img.shields.io/badge/tests-103%20passing-success)](#-testing)
 [![Perft](https://img.shields.io/badge/perft-verified-blue)](#-testing)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=nodedotjs&logoColor=white)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -31,12 +31,12 @@ Complete rules (leg-blocking / flying general / stalemate loss / perpetual-check
 
 ## ✨ Features
 
-- **Zero-dependency single file**: all styles, rules engine, AI and sound effects inlined in one `index.html` (~71KB) — opens straight from `file://`
+- **Zero-dependency single file**: all styles, rules engine, AI and sound effects inlined in one `index.html` (~89KB) — opens straight from `file://`
 - **Complete rules**: leg-blocking (horse), blockable eye (elephant), cannon screen, river-crossing pawns, flying general, stalemate = loss, plus **perpetual-check adjudication** (perpetual check / chase / capture threat)
 - **Built-in AI**: iterative deepening + alpha-beta pruning + quiescence search + check extension, three difficulty levels; AI-vs-AI spectator mode
 - **Assists**: move hints, position eval bar, undo / redo, board flip, captured-piece trays
 - **Chinese notation**: standard file-based notation (e.g. Cannon 2 level 5), click any row to **replay** that position
-- **Import / export**: copy notation text, compact string (`XQ1|FEN|moves`), FEN loading, auto-saved progress
+- **Import / export**: copy notation text, or paste Chinese notation back in (`炮二平五 马8进7 …`, optionally with a FEN first line) — the parser is the exact inverse of the generator; compact string (`XQ1|FEN|moves`), FEN loading, auto-saved progress
 - **Multi-platform**: adaptive desktop / mobile layout, Web Audio–synthesized sound effects
 
 ## 🚀 Quick Start
@@ -91,7 +91,7 @@ The engine is wrapped in `/*<ENGINE>*/` markers and never touches the DOM, so No
 
 ```bash
 npm i                  # install playwright-core (the only devDependency, tests only)
-npm test               # engine + browser integration, 56 tests total
+npm test               # engine + browser integration, 103 tests total
 npm run test:engine    # engine only (pure Node, no browser needed)
 npm run test:browser   # browser integration only (needs a local Chrome / Edge)
 ```
